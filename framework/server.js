@@ -29,7 +29,7 @@ const COMMAND_CODE = {
     QUERY: "QUERY"
 };
 
-const Server = function() {
+const Server = function () {
     this.app = express();
     this.app.set("view engine", "ejs");
 
@@ -41,10 +41,10 @@ const Server = function() {
     return this;
 };
 
-Server.prototype.init = async function(port) {
+Server.prototype.init = async function (port) {
     this.port = port;
     await this.applyDomainList();
-    this.listner = this.app.listen(this.port, function() {
+    this.listner = this.app.listen(this.port, function () {
         Logger.info(`Mockable Server : Start Listening at ${port}`);
     });
     this.status = "Started";
@@ -53,7 +53,7 @@ Server.prototype.init = async function(port) {
 function changeResponseBody(params, body) {
     const values = Object.values(params);
     let objectBody = body;
-    Object.keys(params).forEach(function(key, index) {
+    Object.keys(params).forEach(function (key, index) {
         const value = Number(values[index]) || `"${values[index]}"`;
         try {
             objectBody = objectBody.replace(new RegExp(`{{${key}}}`, 'g'), value);
@@ -161,7 +161,7 @@ function execForEachCommand(match) {
 
     const returnArray = []
 
-    arr.forEach(function(element) {
+    arr.forEach(function (element) {
         let elementOut = body.replace(`{{${elementString}}}`, `${element}`).replace(/(\r|\n)*/g, "");
         try {
             elementOut = JSON.stringify(JSON.parse(elementOut));
@@ -243,11 +243,11 @@ async function filterCommands(pattern, commandType, str, url) {
 }
 
 
-Server.prototype.createEndpoint = async function(domainName, pathObject) {
+Server.prototype.createEndpoint = async function (domainName, pathObject) {
     const path = `${domainName}${pathObject.pathUrl}`;
     Logger.info(`Path : ${path}`)
     try {
-        const response = async function(req, res, next) {
+        const response = async function (req, res, next) {
             if (pathObject.authentication === 1 && (req.headers.authorization !== Database.getToken())) {
                 res.status(401).send("Token miss match; check your api token");
                 return;
@@ -320,36 +320,36 @@ Server.prototype.createEndpoint = async function(domainName, pathObject) {
 
         Logger.info(
             `Endpoint Created {Domain: ${domainName},Endpoint info: ${JSON.stringify(
-        pathObject
-      )}}`
+                pathObject
+            )}}`
         );
     } catch (error) {
         Logger.error(
             `Endpoint Created Error {Domain: ${domainName}${
-        pathObject.path
-      },error: ${error}}`
+            pathObject.path
+            },error: ${error}}`
         );
     }
 };
 
-Server.prototype.applyDomainList = async function() {
+Server.prototype.applyDomainList = async function () {
     try {
         const results = await Database.getAllPaths();
         results.forEach(result => {
-            this.createEndpoint(result.domainName, {...result, header: JSON.parse(result.header) })
+            this.createEndpoint(result.domainName, { ...result, header: JSON.parse(result.header) })
         })
     } catch (error) {
         Logger.error(`Domain List cannot Find ${error}`);
     }
 };
 
-const trimPrefix = function(path, prefix) {
+const trimPrefix = function (path, prefix) {
     return prefix ? path.substr(prefix.length) : path;
 };
 
-const findRoute = function(stack, path) {
+const findRoute = function (stack, path) {
     let routes = [];
-    stack.forEach(function(layer) {
+    stack.forEach(function (layer) {
         if (!layer) return;
         if (layer && !layer.match(path)) return;
         if (["query", "expressInit"].indexOf(layer.name) != -1) return;
@@ -366,13 +366,13 @@ const findRoute = function(stack, path) {
     return routes;
 };
 
-Server.prototype.removeRoute = function(path, method) {
+Server.prototype.removeRoute = function (path, method) {
     Logger.info(`Removing .... {path: ${path}, method: ${method}}`);
     const found = findRoute(this.app._router.stack, path);
 
     let route, stack;
 
-    found.forEach(function(layer) {
+    found.forEach(function (layer) {
         route = layer.route;
         stack = layer.stack;
 
@@ -383,8 +383,8 @@ Server.prototype.removeRoute = function(path, method) {
                 stack.splice(idx, 1);
             } else if (
                 JSON.stringify(route.route.methods)
-                .toUpperCase()
-                .indexOf(method.toUpperCase()) >= 0
+                    .toUpperCase()
+                    .indexOf(method.toUpperCase()) >= 0
             ) {
                 // if method defined delete only the resource with the given ath and method
                 idx = stack.indexOf(route);
@@ -395,7 +395,7 @@ Server.prototype.removeRoute = function(path, method) {
     return true;
 };
 
-Server.prototype.stop = async function() {
+Server.prototype.stop = async function () {
     const port = this.port;
     try {
         await this.listner.close();
@@ -406,7 +406,7 @@ Server.prototype.stop = async function() {
     }
 };
 
-Server.prototype.restart = async function() {
+Server.prototype.restart = async function () {
     if (this.port === null) return;
     await this.stop();
     this.init(this.port);

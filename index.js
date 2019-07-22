@@ -11,7 +11,7 @@ const uuidv1 = require("uuid/v1");
 const db = require("./framework/db");
 const { getPublicIP } = require("./framework/utils");
 const { send } = require("./framework/emailsender");
-const { HOST, ADMIN_PORT, API_PORT, FROM_EMAIL, ADMIN_PREFIX } = require("./config");
+const { ADMIN_PORT, API_PORT, FROM_EMAIL, ADMIN_PREFIX } = require("./config");
 
 const port = Number(process.argv[2]) || API_PORT || 3000;
 
@@ -29,11 +29,12 @@ try {
 }
 
 // save api url
-let apiUrl;
-(async() => {
-    apiUrl = `http://${HOST ? HOST : await getPublicIP()}:${port}`;
+let apiUrl, HOST;
+const setApiUrl = async (host, port) => {
+    HOST = host;
+    apiUrl = `http://${host}:${port}`;
     db.saveApiUrl(apiUrl);
-})();
+}
 
 systemApp.use(bodyParser.urlencoded({ extended: false }));
 systemApp.use(bodyParser.json());
@@ -65,15 +66,15 @@ const sessionChecker = (req, res, next) => {
     }
 };
 
-systemApp.get("/", function(req, res) {
+systemApp.get("/", function (req, res) {
     res.render("login/login", { message: "" });
 });
 
-systemApp.get("/requestReset", function(req, res) {
+systemApp.get("/requestReset", function (req, res) {
     res.render("login/requestReset");
 });
 
-systemApp.post("/requestReset", async function(req, res) {
+systemApp.post("/requestReset", async function (req, res) {
     try {
         req.session.user = null;
         if (!req.body.username) {
@@ -111,7 +112,7 @@ systemApp.post("/requestReset", async function(req, res) {
     }
 });
 
-systemApp.get("/resetPassword/:username/:token", async function(req, res) {
+systemApp.get("/resetPassword/:username/:token", async function (req, res) {
     try {
         const token = await db.getResetToken();
         const user = await db.getUserFromUsername(req.params.username);
@@ -132,22 +133,22 @@ systemApp.get("/resetPassword/:username/:token", async function(req, res) {
     res.redirect(`${ADMIN_PREFIX}/`);
 });
 
-systemApp.get("/status", sessionChecker, async function(req, res) {
+systemApp.get("/status", sessionChecker, async function (req, res) {
     res.redirect(`${HOST ? HOST : await getPublicIP()}/status`);
 });
 
-systemApp.post("/saveToken", function(req, res) {
+systemApp.post("/saveToken", function (req, res) {
     db.saveToken(`Bearer ${req.body.id}`);
     res.end();
 });
 
-systemApp.get("/logout", function(req, res) {
+systemApp.get("/logout", function (req, res) {
     req.session.user = null;
     logger.error(`Logging out`);
     res.redirect(`${ADMIN_PREFIX}/`);
 });
 
-systemApp.post("/passChange", sessionChecker, async function(req, res) {
+systemApp.post("/passChange", sessionChecker, async function (req, res) {
     try {
         db.setUser(req.body.username, req.body.password, req.body.userEmail);
         res.redirect(`${ADMIN_PREFIX}/domain`);
@@ -157,7 +158,7 @@ systemApp.post("/passChange", sessionChecker, async function(req, res) {
     }
 });
 
-systemApp.post("/login", async function(req, res) {
+systemApp.post("/login", async function (req, res) {
     try {
         const user = await db.getUser(req.body.username, req.body.password);
         logger.info(`Logged User : ${JSON.stringify(user)}`);
@@ -179,18 +180,18 @@ systemApp.post("/login", async function(req, res) {
     res.redirect(`${ADMIN_PREFIX}/`);
 });
 
-systemApp.post("/saveEnableUpload", function(req, res) {
+systemApp.post("/saveEnableUpload", function (req, res) {
     db.setEnableUpload({
         enable: req.body.status
     });
     res.end();
 });
 
-systemApp.get("/getEnableUpload", function(req, res) {
+systemApp.get("/getEnableUpload", function (req, res) {
     return res.send(db.getEnableUpload());
 });
 
-systemApp.post("/flushAll", function(req, res) {
+systemApp.post("/flushAll", function (req, res) {
     try {
         db.flushAllUserData();
         res.send({ success: true });
@@ -199,7 +200,7 @@ systemApp.post("/flushAll", function(req, res) {
     }
 });
 
-systemApp.post("/upload", async function(req, res) {
+systemApp.post("/upload", async function (req, res) {
     const isEnable = db.getEnableUpload().enable == "true";
     if (!isEnable) {
         return res.status(401).send("Unauthorized permission to api creation(Enable Upload function)")
@@ -245,7 +246,7 @@ systemApp.post("/upload", async function(req, res) {
             pathUrl,
             pathDescription: pathDescription || "",
             pathMethod: _.toLower(pathMethod),
-            pathStatus: _.isNumber(pathStatus) ? Number.parseInt(pathStatus) : 200,
+            pathStatus: _.isNumber(pathStatus) ? pathStatus : Number.parseInt(pathStatus),
             header: headers,
             authentication: false,
             query,
@@ -276,33 +277,33 @@ systemApp.post("/upload", async function(req, res) {
                 pathId = uuidv1();
                 if (data.query) {
                     data = {
-                       ...data,
-                        body: `#if({{${data.query.parameter}}},=,"${data.query.value}"){${JSON.stringify(data.query.body,null,4)}}endif\n`
+                        ...data,
+                        body: `#if({{${data.query.parameter}}},=,"${data.query.value}"){${JSON.stringify(data.query.body, null, 4)}}endif\n`
                     }
                 }
                 pathId = await db.addPath(domainId, data);
             } else {
-                let body="";
+                let body = "";
                 if (data.query) {
-                    const conditions = existedPath.path.body.split('endif');  
-                    if(conditions.length<=1){
-                        body= body.concat(`#if({{${data.query.parameter}}},=,"${data.query.value}"){${JSON.stringify(data.query.body,null,4)}}endif\n`)
+                    const conditions = existedPath.path.body.split('endif');
+                    if (conditions.length <= 1) {
+                        body = body.concat(`#if({{${data.query.parameter}}},=,"${data.query.value}"){${JSON.stringify(data.query.body, null, 4)}}endif\n`)
                     }
-                    let isUpdated=false;
-                    for(let i=0;i<conditions.length-1;i++){
+                    let isUpdated = false;
+                    for (let i = 0; i < conditions.length - 1; i++) {
                         const condition = conditions[i];
-                        if(condition.split(')')[0].includes(data.query.value)){
-                            body= body.concat(`#if({{${data.query.parameter}}},=,"${data.query.value}"){${JSON.stringify(data.query.body,null,4)}}endif\n`)
-                            isUpdated=true;
-                        }else{
+                        if (condition.split(')')[0].includes(data.query.value)) {
+                            body = body.concat(`#if({{${data.query.parameter}}},=,"${data.query.value}"){${JSON.stringify(data.query.body, null, 4)}}endif\n`)
+                            isUpdated = true;
+                        } else {
                             body = body.concat(`${conditions[i]}endif\n`)
                         }
                     }
-                    if(!isUpdated){
-                       body= body.concat(`#if({{${data.query.parameter}}},=,"${data.query.value}"){${JSON.stringify(data.query.body,null,4)}}endif\n`)  
+                    if (!isUpdated) {
+                        body = body.concat(`#if({{${data.query.parameter}}},=,"${data.query.value}"){${JSON.stringify(data.query.body, null, 4)}}endif\n`)
                     }
                 }
-                data.body=body;
+                data.body = body;
                 await db.updatePath(domainId, pathId, {
                     ...data,
                     authentication: existedPath.authentication
@@ -328,14 +329,42 @@ systemApp.post("/upload", async function(req, res) {
     res.json(result)
 });
 
+systemApp.delete("/api/:domainId/:pathId", async function (req, res) {
+    let domainId = req.params.domainId;
+    let pathId = req.params.pathId;
+
+    try {
+        const pathResult = await db.getPath(domainId, pathId);
+
+        Server().removeRoute(`${pathResult.domainName}${pathResult.paths[0].pathUrl}`, pathResult.paths[0].pathMethod);
+        await db.deletePath(domainId, pathId);
+
+        res.status(200).json({ status: "success" })
+    } catch (error) {
+        logger.error(
+            `Domain Path Deleted Error {id : ${domainId}:${pathId}, error:${error}}`
+        );
+    }
+})
+
 systemApp.use("/domain", sessionChecker, domainRouter);
 systemApp.use("/domain/paths", sessionChecker, pathRouter);
 
-(async function() {
-    await db.createTables();
-    Server().app.use(ADMIN_PREFIX, systemApp);
-    Server().app.get('/', (req, res) => res.redirect(`${ADMIN_PREFIX}/`))
-    await Server().init(port);
-})()
-.then(() => logger.info("Successfully created api server"))
-    .catch(err => logger.error(err));
+const start = async (host, port) => {
+    setApiUrl(host, port);
+    try {
+        await db.createTables();
+        Server().app.use(ADMIN_PREFIX, systemApp);
+        Server().app.get('/', (req, res) => res.redirect(`${ADMIN_PREFIX}/`));
+        await Server().init(port);
+        logger.info("Successfully created api server");
+    } catch (error) {
+        logger.error(error);
+    }
+}
+
+start('localhost', 3000);
+
+module.exports = {
+    start
+}
